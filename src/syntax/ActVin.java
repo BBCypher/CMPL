@@ -3,6 +3,7 @@ package syntax;
 import java.io.InputStream;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.TreeSet;
 
 import lex.*;
 import utils.*;
@@ -97,6 +98,7 @@ public class ActVin extends AutoVin {
 	/**
 	 * acces a un attribut lexical
 	 * cast pour preciser que analyseurLexical est ici de type LexVin
+	 * 
 	 * @return valEnt associe a l'unite lexicale NBENTIER
 	 */
 	private int valEnt() {
@@ -154,28 +156,37 @@ public class ActVin extends AutoVin {
 	}
 
 	/** indice courant du nombre de chauffeurs dans le tableau tabChauf */
-	private int indChauf;
 	/* !!! TODO : DELARATIONS A COMPLETER !!! */
 	/* Variables */
 	private int capaciteCiterne;
-	private int indChauffeur;
+	private int indChauf;// quand il n'y a pas de chauffeur je l'initialise à -1 pour ne pas le confondre
 	private int bj;
 	private int bg;
 	private int ordi;
 	private int qte;
 	private int mag;
-	private String typeVin;
-	private Set<Integer> magDif = new HashSet<>();;
+	private int qualiteCourante;
+	// 0 : BEAUJOLAIS
+	// 1 : BOURGOGNE
+	// 2 : ORDINAIRE
 	private Chauffeur ajtChauff;
 	private boolean dejaAjt = false;
+	private int nbFicheTotale;
+	private boolean ficheCorrect;
+	private int nbFicheCorrect;
 
 	/**
 	 * initialisations a effectuer avant les actions
 	 */
 	private void initialisations() {
-		indChauf = -1;
 
 		/* !!! TODO : A COMPLETER SI BESOIN !!! */
+		indChauf = -1;
+		qualiteCourante = 2;
+		nbFicheTotale = 0;
+		ficheCorrect = true;
+		nbFicheCorrect = 0;
+
 	}
 
 	/**
@@ -187,6 +198,8 @@ public class ActVin extends AutoVin {
 
 		switch (numAct) {
 			case -1: // action vide
+				erreur(NONFATALE, "Erreur syntaxique détectée");
+				ficheCorrect = false;
 				break;
 
 			case 0:
@@ -194,97 +207,111 @@ public class ActVin extends AutoVin {
 				break;
 
 			case 1:
-				indChauffeur = numIdCourant();
+				nbFicheTotale++;
+				boolean found = false;
+				if (indChauf >= MAXCHAUF - 1) {
+					erreur(FATALE, "Nombre maximum de chauffeurs dépassé");
+					ficheCorrect = false;
+				} else {
+					for (int i = 0; i <= MAXCHAUF - 1; i++) {
+						if (tabChauf[i] != null && tabChauf[i].numChauf == numIdCourant()) {
+							found = true;
+							indChauf = i;
+							break;
+						}
 
+					}
+					if (!found && indChauf < MAXCHAUF) {
+						Chauffeur chauf = new Chauffeur(numIdCourant(), 0, 0, 0, new TreeSet<>());
+						tabChauf[indChauf + 1] = chauf;
+						indChauf++;
+					}
+				}
+				break;
 			case 2:
-				int valeur = valEnt();
-				capaciteCiterne = capaciteVerif(valeur);
+				capaciteCiterne = valEnt();
+				if (capaciteCiterne < 100 && capaciteCiterne > 200) {
+					System.out.println("il y a erreur sur cette quantité :" + capaciteCiterne);
+					ficheCorrect = false;
+					capaciteCiterne = 100;
+				}
+				tabChauf[indChauf].setCapMax(capaciteCiterne);
 				break;
 
 			case 3:
-				typeVin = "bg";
+				qualiteCourante = 0;
 				break;
 
 			case 4:
-				typeVin = "bj";
+				qualiteCourante = 1;
 				break;
 
 			case 5:
 				mag = numIdCourant();
-				magDif.add(mag);
+				tabChauf[indChauf].magDif.add(mag);
 				break;
 
 			case 6:
 				qte = valEnt();
+				if (qte == 0) {
+					erreur(NONFATALE, "Error ; quantité livré nulle");
+					ficheCorrect = false;
+				} else if (qte > capaciteCiterne) {
+					erreur(NONFATALE, "Error : capacité citerne insuffisante");
+					ficheCorrect = false;
+				}
+
+				switch (qualiteCourante) {
+					case 0:
+						tabChauf[indChauf].bj += qte;
+						break;
+					case 1:
+						tabChauf[indChauf].bg += qte;
+						break;
+					case 2:
+						tabChauf[indChauf].ordin += qte;
+						break;
+					default:
+						break;
+				}
 				break;
 
 			case 7:
-				if (!dejaAjt) { // si le chauffeur n'est pas encore créé
-					if (typeVin.compareTo("bj") == 0) {
-						ajtChauff = new Chauffeur(indChauffeur, qte, 0, 0, magDif);
-						ajtChauff.setCapMax(capaciteCiterne);
-					} else {
-						if (typeVin.compareTo("bg") == 0) {
-							ajtChauff = new Chauffeur(indChauffeur, 0, qte, 0, magDif);
-							ajtChauff.setCapMax(capaciteCiterne);
-						} else {
-							ajtChauff = new Chauffeur(indChauffeur, 0, 0, qte, magDif);
-							ajtChauff.setCapMax(capaciteCiterne);
-						}
-
-					}
-					for (int i = 0; i < tabChauf.length; i++) {
-						if (tabChauf[i] == null) { // si l'élément courant est vide.
-							tabChauf[i] = ajtChauff; // Ajouter le chauffeur dans le tableau.
-							break; // Sortir de la boucle une fois l'ajout effectué.
-						}
-					}
-					dejaAjt = true;
-				} else { // si le chauffeur est déjà créé
-					ajtChauff.update(typeVin, qte);
-					ajtChauff.setMagDif(magDif);
-				}
+				qualiteCourante = 2;// sinon au cas où l'on ait de l'ordinaire juste après on garderait le type de
+									// vin précédent
 				break;
-			case 8: // Créer le nouvel objet Chauffeur selon sa livraison
-				if (dejaAjt = false) { // si le chauffeur n'est pas encore créé
-					if (typeVin.compareTo("bj") == 0) {
-						ajtChauff = new Chauffeur(indChauffeur, qte, 0, 0, magDif);
-						ajtChauff.setCapMax(capaciteCiterne);
-					} else {
-						if (typeVin.compareTo("bg") == 0) {
-							ajtChauff = new Chauffeur(indChauffeur, 0, qte, 0, magDif);
-							ajtChauff.setCapMax(capaciteCiterne);
-						} else {
-							ajtChauff = new Chauffeur(indChauffeur, 0, 0, qte, magDif);
-							ajtChauff.setCapMax(capaciteCiterne);
-						}
+			case 8:
+				nbFicheCorrect++;
+				Ecriture.ecrireStringln("		à la fin de la fiche " + nbFicheTotale + " de livraison  :");
+				afficherChauf();
+				Ecriture.ecrireStringln("FIN de la fiche " + nbFicheTotale + "\n");
 
-					}
-					for (int i = 0; i < tabChauf.length; i++) {
-						if (tabChauf[i] == null) { // Si l'élément est vide.
-							tabChauf[i] = ajtChauff; // Ajouter le chauffeur dans le tableau.
-							break; // Sortir de la boucle une fois l'ajout effectué.
-						}
-					}
-				} else { // si le chauffeur est déjà créé
-					ajtChauff.update(typeVin, qte);
-					ajtChauff.setMagDif(magDif);
-				}
 				break;
 			case 9:
+
+				Ecriture.ecrireStringln("\nFIN de l'analyse ");
+				afficheMagMax();
+				Ecriture.ecrireStringln(
+						"Fiches correctes : " + nbFicheCorrect + "Nombre total de fiches : " + nbFicheTotale);
+
 				break;
 			default:
 				Lecture.attenteSurLecture("action " + numAct + " non prevue");
 		}
 	}
 
-	public int capaciteVerif(int capaciteCiterne) {
-		if (capaciteCiterne >= 100 && capaciteCiterne <= 200) {
-			return capaciteCiterne;
-		} else {
-			System.out.println("il y a erreur sur cette quantité");
-			return 100;
+	public void afficheMagMax() {
+		int maxMagC = -1;
+		int id = -1;
+
+		for (int i = 0; i < MAXCHAUF; i++) {
+			if (tabChauf[i] != null && tabChauf[i].magDif.size() > maxMagC) {
+				id = i;
+				maxMagC = tabChauf[i].magDif.size();
+			}
 		}
+		String idChaufCourant = ((LexVin) analyseurLexical).chaineIdent(tabChauf[id].numChauf);
+		Ecriture.ecrireStringln("\n" + idChaufCourant + " a livré  " + maxMagC + " magasins différents");
 
 	}
 

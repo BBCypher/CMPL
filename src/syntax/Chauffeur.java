@@ -29,6 +29,7 @@ public class Chauffeur {
 		this.bg = bg;
 		this.ordin = ordin;
 		this.magDif = new TreeSet<Integer>(magDif);
+		this.capMax = 100;
 	}
 
 	public Chauffeur copie() {
@@ -85,29 +86,4 @@ public class Chauffeur {
 		return this.capMax;
 	}
 
-	/*
-	 * prends en paramètre un String correspondant soit à un type de vin et la qté
-	 * livrée soit mag avec une qté correspondant à son indice dans la tabIdent*/
-	/* ne retourne rien mais met à jour les informations du chauffeur */
-	public void update(String nom, int qte) {
-		switch (nom) {
-			case "bj":								//met à jour bj
-				this.bj = this.bj + qte;
-				break;
-			case "bg":								//met à jour bg
-				this.bg = this.bg + qte;
-				break;
-			case "ordi":							//met à jour ordin
-				this.ordin = this.ordin + qte;
-				break;
-			case "mag":								//met à jour magDif
-				this.magDif.add(qte);
-				break;
-				case "cap":							//met à jour ordin
-				this.capMax = qte;
-				break;
-			default:
-				break;
-		}
-	}
 }
